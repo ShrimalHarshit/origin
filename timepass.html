@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Yash Tambe — Creative Developer & 3D Web Architect</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+  <!-- Three.js & GSAP CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #030806;
+      --accent: #00ff88;
+      --accent-dim: rgba(0, 255, 136, 0.16);
+      --text-main: #f2f7f5;
+      --text-muted: rgba(242, 247, 245, 0.55);
+      --rgb-offset: 0px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Space Grotesk', sans-serif;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Fullscreen WebGL Canvas */
+    #webgl-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      cursor: grab;
+    }
+
+    #webgl-canvas:active {
+      cursor: grabbing;
+    }
+
+    /* Subtle CRT / Atmospheric Scanline Vignette */
+    .vignette-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 60%, transparent 45%, rgba(2, 6, 4, 0.85) 100%),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.012) 0px,
+          rgba(255, 255, 255, 0.012) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+    }
+
+    /* Accessible DOM / HUD Overlay */
+    .hud-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(1.25rem, 3vw, 2.5rem);
+    }
+
+    .interactive {
+      pointer-events: auto;
+    }
+
+    /* Top Navigation HUD */
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 1.1rem;
+    }
+
+    .brand-block {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .brand-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.05rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-main);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+      animation: pulse 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: 0.65; }
+    }
+
+    .mono-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .hud-nav {
+      display: flex;
+      gap: 1.75rem;
+      align-items: center;
+    }
+
+    .hud-nav a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.25s ease, text-shadow 0.25s ease;
+      position: relative;
+    }
+
+    .hud-nav a:hover,
+    .hud-nav a.active {
+      color: var(--accent);
+      text-shadow: 0 0 12px rgba(0, 255, 136, 0.45);
+    }
+
+    /* Center-Bottom Hero & Bio Section */
+    .hud-bottom {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-top: auto;
+    }
+
+    .hero-title-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 0.25rem;
+    }
+
+    .active-card-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(3, 18, 12, 0.72);
+      border: 1px solid var(--accent-dim);
+      padding: 0.38rem 0.95rem;
+      border-radius: 999px;
+      margin-bottom: 0.65rem;
+      backdrop-filter: blur(8px);
+      transition: border-color 0.3s ease;
+    }
+
+    /* Selectable Hero Text with Scroll-Velocity RGB Split */
+    .hero-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.35rem, 6.8vw, 6.2rem);
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+      color: #ffffff;
+      user-select: text;
+      pointer-events: auto;
+      text-shadow:
+        calc(var(--rgb-offset) * -1) 0px 0px rgba(255, 30, 86, 0.85),
+        var(--rgb-offset) 0px 0px rgba(0, 240, 255, 0.85),
+        0 0 38px rgba(0, 255, 136, 0.22);
+      transition: text-shadow 0.05s linear;
+    }
+
+    .hero-title span.hash {
+      color: var(--accent);
+      font-weight: 700;
+      margin-right: 0.12em;
+    }
+
+    /* Lower HUD Grid: Bio, Specs & Transition Trigger */
+    .hud-footer-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr auto;
+      gap: 1.5rem;
+      align-items: end;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      background: linear-gradient(to top, rgba(3, 8, 6, 0.82), transparent);
+    }
+
+    .bio-card {
+      max-width: 540px;
+      user-select: text;
+      pointer-events: auto;
+    }
+
+    .bio-card p {
+      font-size: clamp(0.85rem, 1.05vw, 0.98rem);
+      line-height: 1.55;
+      color: rgba(242, 247, 245, 0.82);
+    }
+
+    .bio-card strong {
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .specs-row {
+      display: flex;
+      gap: 2rem;
+    }
+
+    .spec-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .spec-value {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    /* Interactive Next Project / Warp Button */
+    .next-trigger {
+      background: rgba(0, 255, 136, 0.08);
+      border: 1px solid rgba(0, 255, 136, 0.35);
+      color: var(--text-main);
+      padding: 0.9rem 1.4rem;
+      border-radius: 999px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .next-trigger:hover {
+      background: var(--accent);
+      color: #020805;
+      box-shadow: 0 0 28px rgba(0, 255, 136, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .next-trigger .arrow {
+      display: inline-block;
+      transition: transform 0.3s ease;
+    }
+
+    .next-trigger:hover .arrow {
+      transform: translateX(5px);
+    }
+
+    /* Scroll / Drag Hint */
+    .drag-hint {
+      position: fixed;
+      top: 50%;
+      right: 2rem;
+      transform: translateY(-50%);
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.35rem;
+    }
+
+    .velocity-bar-track {
+      width: 2px;
+      height: 70px;
+      background: rgba(255, 255, 255, 0.12);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .velocity-bar-fill {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 15%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      transition: height 0.08s linear;
+    }
+
+    @media (max-width: 900px) {
+      .hud-footer-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      .specs-row, .drag-hint {
+        display: none;
+      }
+      .hud-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- WebGL Scene Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+  <div class="vignette-overlay"></div>
+
+  <!-- Lateral Velocity Telemetry -->
+  <div class="drag-hint">
+    <span class="mono-meta" id="vel-readout">VEL // 0.00</span>
+    <div class="velocity-bar-track">
+      <div class="velocity-bar-fill" id="vel-bar"></div>
+    </div>
+    <span class="mono-meta">SCROLL / DRAG</span>
+  </div>
+
+  <!-- Foreground Accessible DOM & HUD -->
+  <main class="hud-layer">
+    <header class="hud-header">
+      <div class="brand-block interactive">
+        <a href="#about" class="brand-name">
+          <span class="status-dot" id="status-dot"></span>
+          YASH TAMBE // SKYBEAM STUDIO
+        </a>
+        <span class="mono-meta">20.0059° N, 73.7898° E — CREATIVE DEVELOPER &amp; AI ARCHITECT</span>
+      </div>
+
+      <nav class="hud-nav interactive">
+        <a href="#about" class="active">01. About</a>
+        <a href="#works" id="nav-works">02. Works</a>
+        <a href="#shaders" id="nav-lab">03. Shader Lab</a>
+        <a href="mailto:yash@skybeam.studio">04. Contact</a>
+      </nav>
+    </header>
+
+    <section class="hud-bottom">
+      <div class="hero-title-wrap">
+        <div class="active-card-pill" id="active-card-indicator">
+          DRAG OR SCROLL RIBBON // 01 — SKYBEAM STUDIO
+        </div>
+        <h1 class="hero-title" id="hero-heading">
+          <span class="hash">#</span><span id="hero-text">YASH TAMBE</span>
+        </h1>
+      </div>
+
+      <div class="hud-footer-grid">
+        <div class="bio-card">
+          <span class="mono-meta" style="color: var(--accent); display: block; margin-bottom: 0.35rem;">
+            // SYSTEM IDENTITY &amp; MANIFESTO
+          </span>
+          <p id="bio-copy">
+            Co-founder &amp; Creative Lead at <strong>Skybeam Studio</strong> and Computer Engineering student combining
+            <strong>3D WebGL experiences</strong>, <strong>high-craft UI/UX design</strong>, and
+            <strong>autonomous AI systems</strong>. Building tactile interfaces where shader math meets full-stack precision.
+          </p>
+        </div>
+
+        <div class="specs-row">
+          <div class="spec-item">
+            <span class="mono-meta">CORE ENGINE</span>
+            <span class="spec-value">Three.js / GLSL / Next.js / GSAP</span>
+          </div>
+          <div class="spec-item">
+            <span class="mono-meta">SYSTEMS &amp; AI</span>
+            <span class="spec-value">Python / LLMs / CameraX / OpenGL</span>
+          </div>
+        </div>
+
+        <button class="next-trigger interactive" id="warp-btn">
+          <span id="warp-label">Next: Selected Works</span>
+          <span class="arrow">→</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ============================================================================
+    // 1. PROCEDURAL HI-RES CARD TEXTURE GENERATOR (Zero CORS / Instant Render)
+    // ============================================================================
+    const CARDS_DATA = [
+      {
+        id: '01',
+        tag: 'STUDIO // CREATIVE DIRECTION',
+        title: 'SKYBEAM STUDIO',
+        subtitle: 'Co-Founder & Creative Lead — 3D Web, Brand Identity & Motion Systems',
+        metric: 'WEBGL + UI/UX',
+        accent: '#00ff88',
+        secondary: '#052e1c'
+      },
+      {
+        id: '02',
+        tag: 'FULL-STACK // 3D COMMERCE',
+        title: 'NIKE CONCEPT STORE',
+        subtitle: '486-Frame GSAP Scroll Sequence, Supabase Auth & Razorpay Architecture',
+        metric: '60 FPS CANVAS',
+        accent: '#00e5ff',
+        secondary: '#042430'
+      },
+      {
+        id: '03',
+        tag: 'IEEE RESEARCH // EDGE AI',
+        title: 'AUTONOMOUS LLM AGENTS',
+        subtitle: 'Real-Time Anomaly Detection, 5G Network Advisor & Edge Optimization',
+        metric: 'AI / ML SYSTEMS',
+        accent: '#38bdf8',
+        secondary: '#081e36'
+      },
+      {
+        id: '04',
+        tag: 'MOBILE GRAPHICS // SHADERS',
+        title: 'CAMERAX & OPENGL LAB',
+        subtitle: 'Custom Android GLSL Pipeline & Real-Time Digital Image Stabilization',
+        metric: 'NATIVE SHADERS',
+        accent: '#a855f7',
+        secondary: '#230a38'
+      },
+      {
+        id: '05',
+        tag: 'VISUAL SERIES // COLOR GRADING',
+        title: 'THE 3 STAGES SERIES',
+        subtitle: 'Sequential Triptychs: Sensor RAW → AI Reconstruction → Color Grade',
+        metric: 'LIGHTROOM PRO',
+        accent: '#f59e0b',
+        secondary: '#2e1c05'
+      },
+      {
+        id: '06',
+        tag: 'ALGORITHMS // MOTION GRAPHICS',
+        title: 'ALPHA-BETA VISUALIZER',
+        subtitle: 'Heuristic Tree Search Engine with Procedural Audio & Web Speech API',
+        metric: 'HTML5 CANVAS',
+        accent: '#ec4899',
+        secondary: '#30081d'
+      },
+      {
+        id: '07',
+        tag: 'COMMUNITY // LEADERSHIP',
+        title: 'GDG ON CAMPUS LEAD',
+        subtitle: 'Design Team Lead & DevFest Nashik Community Impact Award Recipient',
+        metric: 'DESIGN SYSTEMS',
+        accent: '#10b981',
+        secondary: '#052b22'
+      }
+    ];
+
+    function createCardTexture(card, index) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 640;
+      const ctx = canvas.getContext('2d');
+
+      // Deep dark metallic base gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, 1024, 640);
+      bgGrad.addColorStop(0, '#07120e');
+      bgGrad.addColorStop(0.55, card.secondary);
+      bgGrad.addColorStop(1, '#030706');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, 1024, 640);
+
+      // Subtle perspective wireframe grid
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 1;
+      const step = 64;
+      for (let x = 0; x <= 1024; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 640);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= 640; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(1024, y);
+        ctx.stroke();
+      }
+
+      // Glowing geometric orb artwork on right side of card
+      const orbGrad = ctx.createRadialGradient(780, 300, 10, 780, 300, 260);
+      orbGrad.addColorStop(0, card.accent);
+      orbGrad.addColorStop(0.35, card.accent + '44');
+      orbGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = orbGrad;
+      ctx.beginPath();
+      ctx.arc(780, 300, 260, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Concentric technical rings
+      ctx.strokeStyle = card.accent + '55';
+      ctx.lineWidth = 2;
+      [95, 145, 195].forEach((radius, i) => {
+        ctx.beginPath();
+        ctx.arc(780, 300, radius, i * 0.6, Math.PI * 1.45 + i);
+        ctx.stroke();
+      });
+
+      // Top HUD bar inside card
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.fillRect(48, 44, 928, 2);
+
+      ctx.font = '600 21px "JetBrains Mono", monospace';
+      ctx.fillStyle = card.accent;
+      ctx.fillText(`NODE // ${card.id} — ${card.tag}`, 48, 92);
+
+      // Metric Pill Top-Right
+      ctx.strokeStyle = card.accent;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(750, 62, 224, 42);
+      ctx.font = '700 18px "JetBrains Mono", monospace';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(card.metric, 772, 89);
+
+      // Large Watermark Index Number
+      ctx.font = '800 210px "Syne", sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+      ctx.fillText(card.id, 42, 340);
+
+      // Main Card Title
+      ctx.font = '800 58px "Syne", sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(card.title, 48, 435);
+
+      // Subtitle Wrapping
+      ctx.font = '400 26px "Space Grotesk", sans-serif';
+      ctx.fillStyle = 'rgba(240, 247, 244, 0.76)';
+      const words = card.subtitle.split(' ');
+      let line = '';
+      let y = 492;
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        if (ctx.measureText(testLine).width > 680 && n > 0) {
+          ctx.fillText(line, 48, y);
+          line = words[n] + ' ';
+          y += 36;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, 48, y);
+
+      // Outer Frame Border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(16, 16, 992, 608);
+
+      // Corner Crosshairs
+      ctx.strokeStyle = card.accent;
+      ctx.lineWidth = 4;
+      const c = 28;
+      // Top-left
+      ctx.beginPath(); ctx.moveTo(16, 16 + c); ctx.lineTo(16, 16); ctx.lineTo(16 + c, 16); ctx.stroke();
+      // Top-right
+      ctx.beginPath(); ctx.moveTo(1008 - c, 16); ctx.lineTo(1008, 16); ctx.lineTo(1008, 16 + c); ctx.stroke();
+      // Bottom-left
+      ctx.beginPath(); ctx.moveTo(16, 624 - c); ctx.lineTo(16, 624); ctx.lineTo(16 + c, 624); ctx.stroke();
+      // Bottom-right
+      ctx.beginPath(); ctx.moveTo(1008 - c, 624); ctx.lineTo(1008, 624); ctx.lineTo(1008, 624 - c); ctx.stroke();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.anisotropy = 4;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    // ============================================================================
+    // 2. THREE.JS SCENE, CAMERA & RENDERER SETUP
+    // ============================================================================
+    const canvas = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(0, 0.2, 7.2);
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // ============================================================================
+    // 3. BACKGROUND LAYER: FRESNEL PLANET & ATMOSPHERE SHADERS
+    // ============================================================================
+    const planetVertexShader = `
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      varying vec3 vWorldPosition;
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = -mvPosition.xyz;
+        vWorldPosition = position;
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `;
+
+    const planetFragmentShader = `
+      uniform float uTime;
+      uniform vec3 uPrimaryColor;
+      uniform vec3 uCoreColor;
+
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      varying vec3 vWorldPosition;
+      varying vec2 vUv;
+
+      // 3D Simplex-style procedural noise for planetary terrain
+      vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+      vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+      float snoise(vec3 v) {
+        const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+        vec3 i  = floor(v + dot(v, C.yyy));
+        vec3 x0 = v - i + dot(i, C.xxx);
+        vec3 g = step(x0.yzx, x0.xyz);
+        vec3 l = 1.0 - g;
+        vec3 i1 = min(g.xyz, l.zxy);
+        vec3 i2 = max(g.xyz, l.zxy);
+        vec3 x1 = x0 - i1 + C.xxx;
+        vec3 x2 = x0 - i2 + C.yyy;
+        vec3 x3 = x0 - D.yyy;
+        i = mod289(i);
+        vec4 p = permute(permute(permute(
+                  i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+        float n_ = 0.142857142857;
+        vec3 ns = n_ * D.wyz - D.xzx;
+        vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+        vec4 x_ = floor(j * ns.z);
+        vec4 y_ = floor(j - 7.0 * x_);
+        vec4 x = x_ *ns.x + ns.yyyy;
+        vec4 y = y_ *ns.x + ns.yyyy;
+        vec4 h = 1.0 - abs(x) - abs(y);
+        vec4 b0 = vec4(x.xy, y.xy);
+        vec4 b1 = vec4(x.zw, y.zw);
+        vec4 s0 = floor(b0)*2.0 + 1.0;
+        vec4 s1 = floor(b1)*2.0 + 1.0;
+        vec4 sh = -step(h, vec4(0.0));
+        vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+        vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+        vec3 p0 = vec3(a0.xy,h.x);
+        vec3 p1 = vec3(a0.zw,h.y);
+        vec3 p2 = vec3(a1.xy,h.z);
+        vec3 p3 = vec3(a1.zw,h.w);
+        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+        p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+        m = m * m;
+        return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+      }
+
+      void main() {
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPosition);
+
+        // Multi-octave surface noise
+        float n1 = snoise(vWorldPosition * 0.55 + vec3(uTime * 0.04, uTime * 0.02, 0.0));
+        float n2 = snoise(vWorldPosition * 1.35 - vec3(0.0, uTime * 0.05, uTime * 0.03)) * 0.5;
+        float terrain = (n1 + n2) * 0.5 + 0.5;
+
+        // Top-down horizon lighting
+        vec3 lightDir = normalize(vec3(0.0, 1.0, 0.35));
+        float diff = max(0.0, dot(normal, lightDir));
+
+        // Fresnel Rim Glow Calculation
+        float fresnelTerm = 1.0 - max(0.0, dot(normal, viewDir));
+        float rimGlow = pow(fresnelTerm, 2.6);
+        float outerCrest = pow(fresnelTerm, 5.5);
+
+        // Combine dark textured core with neon Fresnel atmosphere
+        vec3 surfaceColor = mix(uCoreColor, uPrimaryColor * 0.25, terrain * diff);
+        vec3 finalColor = surfaceColor + uPrimaryColor * rimGlow * 1.25 + vec3(0.85, 1.0, 0.95) * outerCrest * 0.9;
+
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    const planetUniforms = {
+      uTime: { value: 0 },
+      uPrimaryColor: { value: new THREE.Color('#00ff88') },
+      uCoreColor: { value: new THREE.Color('#020a06') }
+    };
+
+    const planetGeo = new THREE.SphereGeometry(4.3, 96, 96);
+    const planetMat = new THREE.ShaderMaterial({
+      vertexShader: planetVertexShader,
+      fragmentShader: planetFragmentShader,
+      uniforms: planetUniforms
+    });
+    const planetMesh = new THREE.Mesh(planetGeo, planetMat);
+    planetMesh.position.set(0, -4.35, -2.2);
+    scene.add(planetMesh);
+
+    // Outer Atmospheric Halo (Additive Backside Glow)
+    const haloGeo = new THREE.SphereGeometry(4.78, 64, 64);
+    const haloMat = new THREE.ShaderMaterial({
+      vertexShader: planetVertexShader,
+      fragmentShader: `
+        uniform vec3 uPrimaryColor;
+        varying vec3 vNormal;
+        varying vec3 vViewPosition;
+        void main() {
+          vec3 normal = normalize(vNormal);
+          vec3 viewDir = normalize(vViewPosition);
+          float intensity = pow(0.62 - dot(normal, viewDir), 3.2);
+          gl_FragColor = vec4(uPrimaryColor, 1.0) * max(0.0, intensity * 0.85);
+        }
+      `,
+      uniforms: {
+        uPrimaryColor: planetUniforms.uPrimaryColor
+      },
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false
+    });
+    const haloMesh = new THREE.Mesh(haloGeo, haloMat);
+    haloMesh.position.copy(planetMesh.position);
+    scene.add(haloMesh);
+
+    // ============================================================================
+    // 4. STARFIELD PARTICLE SYSTEM
+    // ============================================================================
+    const starCount = 1600;
+    const starPositions = new Float32Array(starCount * 3);
+    const starScales = new Float32Array(starCount);
+
+    for (let i = 0; i < starCount; i++) {
+      starPositions[i * 3] = (Math.random() - 0.5) * 38;
+      starPositions[i * 3 + 1] = (Math.random() - 0.3) * 24;
+      starPositions[i * 3 + 2] = -3 - Math.random() * 18;
+      starScales[i] = Math.random();
+    }
+
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starGeo.setAttribute('aScale', new THREE.BufferAttribute(starScales, 1));
+
+    const starMat = new THREE.ShaderMaterial({
+      vertexShader: `
+        attribute float aScale;
+        uniform float uTime;
+        varying float vAlpha;
+        void main() {
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vAlpha = 0.3 + 0.7 * sin(uTime * 1.5 + aScale * 25.0);
+          gl_PointSize = (1.5 + aScale * 2.5) * (10.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        varying float vAlpha;
+        void main() {
+          float d = length(gl_PointCoord - vec2(0.5));
+          if (d > 0.5) discard;
+          float strength = smoothstep(0.5, 0.05, d);
+          gl_FragColor = vec4(0.85, 1.0, 0.94, strength * vAlpha * 0.75);
+        }
+      `,
+      uniforms: { uTime: { value: 0 } },
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    const starPoints = new THREE.Points(starGeo, starMat);
+    scene.add(starPoints);
+
+    // ============================================================================
+    // 5. MIDGROUND LAYER: CURVED 3D CAROUSEL (VERTEX BENDING + RGB SHIFT SHADER)
+    // ============================================================================
+    const cardVertexShader = `
+      uniform float uOffset;
+      uniform float uVelocity;
+      uniform float uTime;
+      uniform float uHover;
+      uniform float uCurvature;
+      uniform float uRadius;
+
+      varying vec2 vUv;
+      varying float vDistFromCenter;
+
+      void main() {
+        vUv = uv;
+        vec3 pos = position;
+
+        // Subtle hover scale boost
+        pos.xy *= (1.0 + uHover * 0.06);
+
+        // World X coordinate of this specific vertex
+        float worldX = pos.x + uOffset;
+        vDistFromCenter = worldX;
+
+        // Cylindrical Arc Displacement (Segerman-style curved ribbon)
+        float angle = worldX * uCurvature;
+        pos.z -= (1.0 - cos(angle)) * uRadius;
+        pos.y -= pow(abs(worldX) * 0.14, 2.0) * 0.45;
+
+        // Scroll-velocity fluid ribbon wave
+        float wave = sin(uv.x * 3.14159 + uTime * 4.0) * uVelocity * 0.22;
+        pos.z += wave;
+        pos.x -= sin(uv.y * 3.14159) * uVelocity * 0.14;
+
+        vec4 mvPosition = modelViewMatrix * vec4(pos.x + uOffset, pos.y + 0.42, pos.z, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `;
+
+    const cardFragmentShader = `
+      uniform sampler2D uTexture;
+      uniform float uVelocity;
+      uniform float uHover;
+      uniform vec3 uAccentColor;
+
+      varying vec2 vUv;
+      varying float vDistFromCenter;
+
+      void main() {
+        // Chromatic Aberration (RGB Split) proportional to scroll velocity & edge distance
+        float aberration = (abs(uVelocity) * 0.022) + (abs(vDistFromCenter) * 0.0012);
+        vec2 shift = vec2(aberration, aberration * 0.25);
+
+        float r = texture2D(uTexture, vUv + shift).r;
+        float g = texture2D(uTexture, vUv).g;
+        float b = texture2D(uTexture, vUv - shift).b;
+
+        vec3 color = vec3(r, g, b);
+
+        // Distance dimming for peripheral cards
+        float vignette = smoothstep(7.5, 1.2, abs(vDistFromCenter));
+        color *= (0.45 + 0.55 * vignette);
+
+        // Interactive Hover Border Highlight
+        vec2 borderUv = abs(vUv - 0.5) * 2.0;
+        float borderMask = max(borderUv.x, borderUv.y);
+        float glowEdge = smoothstep(0.94, 0.995, borderMask);
+        color += uAccentColor * glowEdge * (0.25 + uHover * 0.85);
+
+        gl_FragColor = vec4(color, 0.96);
+      }
+    `;
+
+    const carouselGroup = new THREE.Group();
+    scene.add(carouselGroup);
+
+    const cardWidth = 2.65;
+    const cardHeight = 1.66;
+    const cardGap = 0.48;
+    const stride = cardWidth + cardGap;
+    const totalTrackWidth = CARDS_DATA.length * stride;
+
+    const cardGeo = new THREE.PlaneGeometry(cardWidth, cardHeight, 48, 24);
+    const cardMeshes = [];
+
+    CARDS_DATA.forEach((data, index) => {
+      const texture = createCardTexture(data, index);
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: cardVertexShader,
+        fragmentShader: cardFragmentShader,
+        uniforms: {
+          uTexture: { value: texture },
+          uOffset: { value: index * stride },
+          uVelocity: { value: 0 },
+          uTime: { value: 0 },
+          uHover: { value: 0 },
+          uCurvature: { value: 0.19 },
+          uRadius: { value: 5.2 },
+          uAccentColor: { value: new THREE.Color(data.accent) }
+        },
+        transparent: true
+      });
+
+      const mesh = new THREE.Mesh(cardGeo, mat);
+      // Keep an invisible bounding proxy position for raycasting
+      mesh.userData = { index, data, baseOffset: index * stride };
+      carouselGroup.add(mesh);
+      cardMeshes.push(mesh);
+    });
+
+    // ============================================================================
+    // 6. INERTIA SCROLL, DRAG & RAYCASTER INTERACTION
+    // ============================================================================
+    let targetScroll = 0;
+    let currentScroll = 0;
+    let scrollVelocity = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragScrollStart = 0;
+
+    const mouse = new THREE.Vector2(0, 0);
+    const targetMouse = new THREE.Vector2(0, 0);
+
+    // Wheel Scroll
+    window.addEventListener('wheel', (e) => {
+      targetScroll += (e.deltaY + e.deltaX) * 0.0032;
+    }, { passive: true });
+
+    // Pointer Drag
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.interactive')) return;
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragScrollStart = targetScroll;
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      targetMouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      targetMouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      if (isDragging) {
+        const deltaX = e.clientX - dragStartX;
+        targetScroll = dragScrollStart - deltaX * 0.0085;
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      isDragging = false;
+    });
+
+    // ============================================================================
+    // 7. SCENE MODE / THEME TRANSITION ("NEXT: SELECTED WORKS" TRIGGER)
+    // ============================================================================
+    const THEMES = [
+      {
+        name: 'YASH TAMBE',
+        pill: 'ABOUT // CREATIVE DEVELOPER & AI ARCHITECT',
+        color: '#00ff88',
+        core: '#020a06',
+        btn: 'Next: Selected Works'
+      },
+      {
+        name: 'SELECTED WORKS',
+        pill: 'SHOWCASE // FULL-STACK, 3D WEBGL & SHADERS',
+        color: '#00e5ff',
+        core: '#020812',
+        btn: 'Next: AI & Shader Lab'
+      },
+      {
+        name: 'SHADER & AI LAB',
+        pill: 'R&D // CAMERAX, OPENGL & AUTONOMOUS AGENTS',
+        color: '#a855f7',
+        core: '#0b0314',
+        btn: 'Back: System Identity'
+      }
+    ];
+    let currentThemeIndex = 0;
+
+    const warpBtn = document.getElementById('warp-btn');
+    const heroText = document.getElementById('hero-text');
+    const warpLabel = document.getElementById('warp-label');
+    const activePill = document.getElementById('active-card-indicator');
+
+    function triggerWarpTransition() {
+      currentThemeIndex = (currentThemeIndex + 1) % THEMES.length;
+      const nextTheme = THEMES[currentThemeIndex];
+      const newColor = new THREE.Color(nextTheme.color);
+      const newCore = new THREE.Color(nextTheme.core);
+
+      // Surge the carousel forward
+      targetScroll += stride * 2.5;
+
+      // Update CSS Accent Variable
+      document.documentElement.style.setProperty('--accent', nextTheme.color);
+
+      // Animate Planet Shader Uniforms
+      gsap.to(planetUniforms.uPrimaryColor.value, {
+        r: newColor.r,
+        g: newColor.g,
+        b: newColor.b,
+        duration: 1.2,
+        ease: 'power3.out'
+      });
+
+      gsap.to(planetUniforms.uCoreColor.value, {
+        r: newCore.r,
+        g: newCore.g,
+        b: newCore.b,
+        duration: 1.2,
+        ease: 'power3.out'
+      });
+
+      // Camera FOV / Z-Warp Punch
+      gsap.fromTo(camera.position,
+        { z: 7.2 },
+        { z: 6.45, duration: 0.45, yoyo: true, repeat: 1, ease: 'power2.inOut' }
+      );
+
+      // Glitch / Swap Hero Title
+      gsap.to(heroText, {
+        opacity: 0,
+        y: 12,
+        duration: 0.2,
+        onComplete: () => {
+          heroText.textContent = nextTheme.name;
+          warpLabel.textContent = nextTheme.btn;
+          activePill.textContent = nextTheme.pill;
+          gsap.to(heroText, { opacity: 1, y: 0, duration: 0.4, ease: 'power3.out' });
+        }
+      });
+    }
+
+    warpBtn.addEventListener('click', triggerWarpTransition);
+    document.getElementById('nav-works').addEventListener('click', (e) => {
+      e.preventDefault();
+      triggerWarpTransition();
+    });
+    document.getElementById('nav-lab').addEventListener('click', (e) => {
+      e.preventDefault();
+      triggerWarpTransition();
+    });
+
+    // ============================================================================
+    // 8. MAIN RENDER & ANIMATION LOOP
+    // ============================================================================
+    const clock = new THREE.Clock();
+    const velReadout = document.getElementById('vel-readout');
+    const velBar = document.getElementById('vel-bar');
+    let lastActiveCardIndex = -1;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsedTime = clock.getElapsedTime();
+
+      // Smooth Lerp for Scroll & Mouse Parallax
+      currentScroll += (targetScroll - currentScroll) * 0.075;
+      scrollVelocity = (targetScroll - currentScroll) * 0.38;
+
+      mouse.x += (targetMouse.x - mouse.x) * 0.06;
+      mouse.y += (targetMouse.y - mouse.y) * 0.06;
+
+      // Update Planet & Stars
+      planetUniforms.uTime.value = elapsedTime;
+      starMat.uniforms.uTime.value = elapsedTime;
+
+      planetMesh.rotation.y = elapsedTime * 0.05 + mouse.x * 0.15;
+      planetMesh.rotation.x = mouse.y * 0.08;
+      starPoints.rotation.y = elapsedTime * 0.012 - mouse.x * 0.05;
+      starPoints.rotation.x = -mouse.y * 0.04;
+
+      // Subtle Camera Parallax
+      camera.position.x = mouse.x * 0.28;
+      camera.position.y = 0.2 + mouse.y * 0.18;
+      camera.lookAt(0, 0.1, 0);
+
+      // Update Carousel Cards & Find Center Active Card
+      let closestCardIndex = 0;
+      let minDistance = Infinity;
+
+      cardMeshes.forEach((mesh, idx) => {
+        const rawPos = mesh.userData.baseOffset - currentScroll;
+        // Infinite modulo wrap inside [-totalTrackWidth/2, totalTrackWidth/2]
+        const wrappedX = ((((rawPos + totalTrackWidth / 2) % totalTrackWidth) + totalTrackWidth) % totalTrackWidth) - totalTrackWidth / 2;
+
+        mesh.material.uniforms.uOffset.value = wrappedX;
+        mesh.material.uniforms.uVelocity.value = scrollVelocity;
+        mesh.material.uniforms.uTime.value = elapsedTime;
+
+        const dist = Math.abs(wrappedX);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestCardIndex = idx;
+        }
+
+        // Highlight the card closest to the center
+        const targetHover = dist < 1.1 ? 1.0 : 0.0;
+        mesh.material.uniforms.uHover.value += (targetHover - mesh.material.uniforms.uHover.value) * 0.1;
+      });
+
+      // Sync HUD Active Card Indicator when center card changes
+      if (closestCardIndex !== lastActiveCardIndex && Math.abs(scrollVelocity) > 0.01) {
+        lastActiveCardIndex = closestCardIndex;
+        const activeData = CARDS_DATA[closestCardIndex];
+        activePill.textContent = `FOCUSED NODE // ${activeData.id} — ${activeData.title}`;
+      }
+
+      // Sync DOM Hero Text Chromatic Aberration & Telemetry Bar with Velocity
+      const absVel = Math.min(Math.abs(scrollVelocity), 2.5);
+      document.documentElement.style.setProperty('--rgb-offset', `${(scrollVelocity * 6.5).toFixed(2)}px`);
+      velReadout.textContent = `VEL // ${absVel.toFixed(2)}`;
+      velBar.style.height = `${Math.min(100, 12 + absVel * 45)}%`;
+
+      renderer.render(scene, camera);
+    }
+
+    // Entrance GSAP Animation
+    gsap.from('.hud-header, .hero-title-wrap, .hud-footer-grid', {
+      y: 30,
+      opacity: 0,
+      duration: 1.1,
+      stagger: 0.15,
+      ease: 'power3.out',
+      delay: 0.2
+    });
+
+    animate();
+
+    // Responsive Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>
